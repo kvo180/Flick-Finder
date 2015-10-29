@@ -16,6 +16,12 @@ let EXTRAS = "url_m"
 let SAFE_SEARCH = "1"
 let DATA_FORMAT = "json"
 let NO_JSON_CALLBACK = "1"
+let BOUNDING_BOX_HALF_WIDTH = 0.5
+let BOUNDING_BOX_HALF_HEIGHT = 0.5
+let LAT_MIN = -90.0
+let LAT_MAX = 90.0
+let LON_MIN = -180.0
+let LON_MAX = 180.0
 
 class ViewController: UIViewController, UITextFieldDelegate {
     
@@ -28,19 +34,23 @@ class ViewController: UIViewController, UITextFieldDelegate {
     @IBOutlet weak var locationSearchButton: UIButton!
     @IBOutlet weak var imageLabel: UILabel!
     @IBOutlet weak var defaultLabel: UILabel!
+    @IBOutlet weak var statusLabel: UILabel!
     let whitespaceSet = NSCharacterSet.whitespaceCharacterSet()
+    let digitSet = NSCharacterSet(charactersInString: "-0123456789").invertedSet
     var photoTitle: String = ""
     var defaultLabelText: String = ""
+    var statusText: String = ""
     var tapRecognizer: UITapGestureRecognizer!
     // 1 - Hardcode the arguments
     var methodArguments = [
-    "method": METHOD_NAME,
-    "api_key": API_KEY,
-    "text": "",
-    "safe_search": SAFE_SEARCH,
-    "extras": EXTRAS,
-    "format": DATA_FORMAT,
-    "nojsoncallback": NO_JSON_CALLBACK
+        "method": METHOD_NAME,
+        "api_key": API_KEY,
+        "text": "",
+        "safe_search": SAFE_SEARCH,
+        "extras": EXTRAS,
+        "format": DATA_FORMAT,
+        "nojsoncallback": NO_JSON_CALLBACK,
+        "bbox": ""
     ]
 
     // MARK: - UI Lifecycle
@@ -72,16 +82,34 @@ class ViewController: UIViewController, UITextFieldDelegate {
     
     // MARK: - IBActions
     @IBAction func phraseSearchButtonPressed(sender: AnyObject) {
-        
-        executeSearch()
-        
+    
+        executePhraseSearch()
         view.endEditing(true)
     }
     
     @IBAction func locationSearchButtonPressed(sender: AnyObject) {
+        
+        executeLatLonSearch()
+        view.endEditing(true)
     }
     
-    // MARK: - Get image method
+    // MARK: - Lat/Lon Manipulations
+    func createBoundingBoxString() -> String {
+        
+        let latitude = (latitudeTextField.text! as NSString).doubleValue
+        let longitude = (longitudeTextField.text! as NSString).doubleValue
+        
+        let bottom_left_lon = max(longitude - BOUNDING_BOX_HALF_WIDTH, LON_MIN)
+        let bottom_left_lat = max(latitude - BOUNDING_BOX_HALF_HEIGHT, LAT_MIN)
+        let top_right_lon = min(longitude + BOUNDING_BOX_HALF_WIDTH, LON_MAX)
+        let top_right_lat = min(latitude + BOUNDING_BOX_HALF_HEIGHT, LAT_MAX)
+        
+        print("\(bottom_left_lon),\(bottom_left_lat),\(top_right_lon),\(top_right_lat)")
+        return "\(bottom_left_lon),\(bottom_left_lat),\(top_right_lon),\(top_right_lat)"
+    }
+    
+    // MARK: - Flickr API Method
+    // 2 - Call the Flickr API using arguments
     func getImageFromFlickrBySearch(methodArguments: [String : AnyObject]) {
         
         // 3 - Initialize shared NSURLSession
@@ -89,6 +117,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
         
         // 4 - Create NSURLRequest
         let urlString = BASE_URL + escapedParameters(methodArguments)
+        print(urlString)
         let url = NSURL(string: urlString)!
         let request = NSURLRequest(URL: url)
         
@@ -127,10 +156,16 @@ class ViewController: UIViewController, UITextFieldDelegate {
             
             // GUARD: Check if any images have been returned
             if let totalPhotos = photosDictionary["total"] as? String {
-                guard Int(totalPhotos) > 0 else {
+                if Int(totalPhotos) == 0 {
+                    self.statusText = "No photos found"
                     print("No images have been returned")
+                    dispatch_async(dispatch_get_main_queue(), {
+                        self.statusLabel.text = self.statusText
+                    })
                     return
                 }
+                print("\(totalPhotos) photos found.")
+                self.statusText = "\(totalPhotos) photos found"
             }
             
             // photosArray is an array that contains dictionaries
@@ -145,6 +180,10 @@ class ViewController: UIViewController, UITextFieldDelegate {
             // If photo has a 'title' key, assign its value to 'photoTitle' string, otherwise display default 'Untitled' text on imageLabel
             if let title = randomPhotoDictionary["title"] as? String {
                 self.photoTitle = title
+                print("Title: \(title)")
+                if title == "" {
+                    self.photoTitle = "Untitled"
+                }
             } else {
                 self.photoTitle = "Untitled"
             }
@@ -164,6 +203,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
                     self.defaultLabel.alpha = 0.0
                     self.imageView.image = UIImage(data: imageData)
                     self.imageLabel.text = self.photoTitle
+                    self.statusLabel.text = self.statusText
                 })
             } else {
                 print("Image does not exist at \(imageUrl)")
@@ -200,21 +240,14 @@ class ViewController: UIViewController, UITextFieldDelegate {
         return (!urlVars.isEmpty ? "?" : "") + urlVars.joinWithSeparator("&")
     }
     
-    // Set textField text value to 'text' key in methodArguments
-    func setInputText() {
-        if let inputText = phraseTextField.text {
-            methodArguments["text"] = inputText
-        } else {
-            print("Text entered is nil")
-        }
-    }
-    
     // Run only if textField is not empty or does not contain only whitespace
-    func executeSearch() {
+    func executePhraseSearch() {
         if phraseTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" {
-            setInputText()
             
-            // 2 - Call the Flickr API using arguments
+            methodArguments["text"] = phraseTextField.text
+            methodArguments["bbox"] = ""
+            
+            // Call Flickr API method
             getImageFromFlickrBySearch(methodArguments)
         } else {
             imageLabel.text  = "Please enter a search request!"
@@ -222,10 +255,29 @@ class ViewController: UIViewController, UITextFieldDelegate {
         }
     }
     
-    // MARK: Delegate methods
+    func executeLatLonSearch() {
+        if latitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" && longitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" && latitudeTextField.text! != digitSet && longitudeTextField.text! != digitSet {
+            
+            methodArguments["bbox"] = createBoundingBoxString()
+            methodArguments["text"] = ""
+            
+            // Call Flickr API method
+            getImageFromFlickrBySearch(methodArguments)
+        } else {
+            imageLabel.text  = "Please enter valid latitude/longitude values!"
+            imageView.image = nil
+        }
+    }
+    
+    // MARK: - Delegate methods
     func textFieldShouldReturn(textField: UITextField) -> Bool {
-        executeSearch()
+        if phraseTextField.isFirstResponder() {
+            executePhraseSearch()
+        } else {
+            executeLatLonSearch()
+        }
         textField.resignFirstResponder()
+        
         return true
     }
     
