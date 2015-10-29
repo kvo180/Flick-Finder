@@ -28,9 +28,20 @@ class ViewController: UIViewController, UITextFieldDelegate {
     @IBOutlet weak var locationSearchButton: UIButton!
     @IBOutlet weak var imageLabel: UILabel!
     @IBOutlet weak var defaultLabel: UILabel!
-    var photoTitle: String!
-    var methodArguments: [String : AnyObject]!
+    let whitespaceSet = NSCharacterSet.whitespaceCharacterSet()
+    var photoTitle: String = ""
+    var defaultLabelText: String = ""
     var tapRecognizer: UITapGestureRecognizer!
+    // 1 - Hardcode the arguments
+    var methodArguments = [
+    "method": METHOD_NAME,
+    "api_key": API_KEY,
+    "text": "",
+    "safe_search": SAFE_SEARCH,
+    "extras": EXTRAS,
+    "format": DATA_FORMAT,
+    "nojsoncallback": NO_JSON_CALLBACK
+    ]
 
     // MARK: - UI Lifecycle
     override func viewDidLoad() {
@@ -41,7 +52,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
         latitudeTextField.delegate = self
         longitudeTextField.delegate = self
         
-        // Define gesture recognizer
+        // Add gesture recognizers
         tapRecognizer = UITapGestureRecognizer(target: self, action: "dismissKeyboard")
     }
     
@@ -62,19 +73,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
     // MARK: - IBActions
     @IBAction func phraseSearchButtonPressed(sender: AnyObject) {
         
-        // 1 - Hardcode the arguments
-        methodArguments = [
-            "method": METHOD_NAME,
-            "api_key": API_KEY,
-            "text": phraseTextField.text!,
-            "safe_search": SAFE_SEARCH,
-            "extras": EXTRAS,
-            "format": DATA_FORMAT,
-            "nojsoncallback": NO_JSON_CALLBACK
-        ]
-        
-        // 2 - Call the Flickr API using arguments
-        getImageFromFlickrBySearch(methodArguments)
+        executeSearch()
         
         view.endEditing(true)
     }
@@ -90,12 +89,13 @@ class ViewController: UIViewController, UITextFieldDelegate {
         
         // 4 - Create NSURLRequest
         let urlString = BASE_URL + escapedParameters(methodArguments)
-        print(urlString)
         let url = NSURL(string: urlString)!
         let request = NSURLRequest(URL: url)
         
         /* 5 - Initialize task for getting data 
-        NOTE: The code block below is inside a completion handler, which is executed on a background thread. In order to update the UI properly, the code to update the UI has to be on the MAIN thread, otherwise delays in the UI could happen. This can be done using the dispatch_async(dispatch_get_main_queue) method. */
+        NOTE 1: The code block below is inside a completion handler, which is executed on a background thread. In order to update the UI properly, the code to update the UI has to be on the MAIN thread, otherwise delays in the UI could happen. This can be done using the dispatch_async(dispatch_get_main_queue) method.
+        NOTE 2: If a 'guard' code block below returns an error, it will exit the entire 'let task' method, and anything declared after it will be executed BEFORE the error is thrown. Because of this, label texts can't be set inside the 'guard' code blocks and must instead be set outside of the 'let task' method.
+        */
         let task = session.dataTaskWithRequest(request) { (data, response, error) in
             
             // GUARD: Check for a successful response
@@ -200,11 +200,32 @@ class ViewController: UIViewController, UITextFieldDelegate {
         return (!urlVars.isEmpty ? "?" : "") + urlVars.joinWithSeparator("&")
     }
     
+    // Set textField text value to 'text' key in methodArguments
+    func setInputText() {
+        if let inputText = phraseTextField.text {
+            methodArguments["text"] = inputText
+        } else {
+            print("Text entered is nil")
+        }
+    }
+    
+    // Run only if textField is not empty or does not contain only whitespace
+    func executeSearch() {
+        if phraseTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" {
+            setInputText()
+            
+            // 2 - Call the Flickr API using arguments
+            getImageFromFlickrBySearch(methodArguments)
+        } else {
+            imageLabel.text  = "Please enter a search request!"
+            imageView.image = nil
+        }
+    }
+    
     // MARK: Delegate methods
     func textFieldShouldReturn(textField: UITextField) -> Bool {
-        getImageFromFlickrBySearch(methodArguments)
+        executeSearch()
         textField.resignFirstResponder()
-                print(phraseTextField.text)
         return true
     }
     
@@ -229,6 +250,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
     func keyboardWillShow(notification: NSNotification) {
         UIView.animateWithDuration(0.5, animations: {
             self.view.frame.origin.y = -self.getKeyboardHeight(notification)
+            self.defaultLabel.alpha = 0.0
         })
     }
     
@@ -237,6 +259,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
         let initialViewRect: CGRect = CGRectMake(0.0, 0.0, view.frame.size.width, view.frame.size.height)
         UIView.animateWithDuration(0.5, animations: {
             self.view.frame = initialViewRect
+            self.defaultLabel.alpha = 1.0
         })
     }
     
