@@ -42,15 +42,13 @@ class ViewController: UIViewController, UITextFieldDelegate {
     var statusText: String = ""
     var tapRecognizer: UITapGestureRecognizer!
     // 1 - Hardcode the arguments
-    var methodArguments = [
+    var methodArguments: [String : AnyObject] = [
         "method": METHOD_NAME,
         "api_key": API_KEY,
-        "text": "",
         "safe_search": SAFE_SEARCH,
         "extras": EXTRAS,
         "format": DATA_FORMAT,
         "nojsoncallback": NO_JSON_CALLBACK,
-        "bbox": ""
     ]
 
     // MARK: - UI Lifecycle
@@ -109,21 +107,77 @@ class ViewController: UIViewController, UITextFieldDelegate {
     }
     
     // MARK: - Flickr API Method
-    // 2 - Call the Flickr API using arguments
+    /* Since Flickr only allows a maximum of 4000 photos per search query, a default setting of 100 images per page will result in a maximum of 40 pages. First select a random page number, then choose a random photo from that page. */
     func getImageFromFlickrBySearch(methodArguments: [String : AnyObject]) {
+        
+        let session = NSURLSession.sharedSession()
+        let urlString = BASE_URL + escapedParameters(methodArguments)
+        let url = NSURL(string: urlString)!
+        let request = NSURLRequest(URL: url)
+        
+        let task = session.dataTaskWithRequest(request) { (data, response, error) in
+            
+            // GUARD: Check for a successful response
+            guard (error == nil) else {
+                print("There was an error with your request: \(error)")
+                return
+            }
+            
+            // GUARD: Check if any data was returned
+            guard let data = data else {
+                print("No data was returned by the request!")
+                return
+            }
+            
+            // Parse the JSON data
+            let parsedResult: AnyObject!
+            do {
+                parsedResult = try NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments) as! NSDictionary
+            }
+            catch {
+                parsedResult = nil
+                print("Could not parse the data as JSON: \(data)")
+            }
+            
+            guard let photosDictionary = parsedResult["photos"] as? NSDictionary else {
+                print("Cannot find key 'photos' in \(parsedResult)")
+                return
+            }
+            
+            guard let totalPages = photosDictionary["pages"] as? Int else {
+                print("Cannot find key 'pages' in \(photosDictionary)")
+                return
+            }
+            
+            // Pick a random page
+            let pageLimit = min(totalPages, 40)
+            let randomPage = Int(arc4random_uniform(UInt32(pageLimit))) + 1
+            self.methodArguments["page"] = randomPage
+            self.getImageFromFlickrBySearchWithPage(methodArguments, randomPage: randomPage)
+        }
+        
+        task.resume()
+    }
+    
+    // 2 - Call the Flickr API using arguments
+    func getImageFromFlickrBySearchWithPage(methodArguments: [String : AnyObject], randomPage: Int) {
+        
+        var withPageDictionary = methodArguments
+        withPageDictionary["page"] = randomPage
+        print(withPageDictionary)
         
         // 3 - Initialize shared NSURLSession
         let session = NSURLSession.sharedSession()
         
         // 4 - Create NSURLRequest
-        let urlString = BASE_URL + escapedParameters(methodArguments)
+        let urlString = BASE_URL + escapedParameters(withPageDictionary)
         print(urlString)
         let url = NSURL(string: urlString)!
         let request = NSURLRequest(URL: url)
         
         /* 5 - Initialize task for getting data 
         NOTE 1: The code block below is inside a completion handler, which is executed on a background thread. In order to update the UI properly, the code to update the UI has to be on the MAIN thread, otherwise delays in the UI could happen. This can be done using the dispatch_async(dispatch_get_main_queue) method.
-        NOTE 2: If a 'guard' code block below returns an error, it will exit the entire 'let task' method, and anything declared after it will be executed BEFORE the error is thrown. Because of this, label texts can't be set inside the 'guard' code blocks and must instead be set outside of the 'let task' method.
+        NOTE 2: If a 'guard' code block below returns an error, it will exit the entire 'let task' method, and anything declared after it will be executed BEFORE the error is thrown. Because of this, label texts can't be set inside the 'guard' code blocks and must instead be set inside 'if-let' methods.
         */
         let task = session.dataTaskWithRequest(request) { (data, response, error) in
             
@@ -244,13 +298,14 @@ class ViewController: UIViewController, UITextFieldDelegate {
     func executePhraseSearch() {
         if phraseTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" {
             
-            methodArguments["text"] = phraseTextField.text
-            methodArguments["bbox"] = ""
+            var phraseSearchDictionary = methodArguments
+            phraseSearchDictionary["text"] = phraseTextField.text
             
             // Call Flickr API method
-            getImageFromFlickrBySearch(methodArguments)
+            getImageFromFlickrBySearch(phraseSearchDictionary)
         } else {
             imageLabel.text  = "Please enter a search request!"
+            statusLabel.text = ""
             imageView.image = nil
         }
     }
@@ -258,13 +313,14 @@ class ViewController: UIViewController, UITextFieldDelegate {
     func executeLatLonSearch() {
         if latitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" && longitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" && latitudeTextField.text! != digitSet && longitudeTextField.text! != digitSet {
             
-            methodArguments["bbox"] = createBoundingBoxString()
-            methodArguments["text"] = ""
+            var locationSearchDictionary = methodArguments
+            locationSearchDictionary["bbox"] = createBoundingBoxString()
             
             // Call Flickr API method
-            getImageFromFlickrBySearch(methodArguments)
+            getImageFromFlickrBySearch(locationSearchDictionary)
         } else {
             imageLabel.text  = "Please enter valid latitude/longitude values!"
+            statusLabel.text = ""
             imageView.image = nil
         }
     }
