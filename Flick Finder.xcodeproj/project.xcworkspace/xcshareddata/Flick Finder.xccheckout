@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>3E33E2DE-F120-4EB1-B350-C09A82D37FB5</string>
+	<key>IDESourceControlProjectName</key>
+	<string>project</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>37CCA74A14FFCE16C013181F4CF285F8F3D21867</key>
+		<string>https://github.com/kvo180/Flick-Finder.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>Flick Finder.xcodeproj/project.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>37CCA74A14FFCE16C013181F4CF285F8F3D21867</key>
+		<string>../..</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://github.com/kvo180/Flick-Finder.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>111</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>37CCA74A14FFCE16C013181F4CF285F8F3D21867</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>37CCA74A14FFCE16C013181F4CF285F8F3D21867</string>
+			<key>IDESourceControlWCCName</key>
+			<string>Flick%20Finder</string>
+		</dict>
+	</array>
+</dict>
+</plist>

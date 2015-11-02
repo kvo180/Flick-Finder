@@ -36,7 +36,6 @@ class ViewController: UIViewController, UITextFieldDelegate {
     @IBOutlet weak var defaultLabel: UILabel!
     @IBOutlet weak var statusLabel: UILabel!
     let whitespaceSet = NSCharacterSet.whitespaceCharacterSet()
-    let digitSet = NSCharacterSet(charactersInString: "-0123456789").invertedSet
     var photoTitle: String = ""
     var defaultLabelText: String = ""
     var statusText: String = ""
@@ -102,7 +101,6 @@ class ViewController: UIViewController, UITextFieldDelegate {
         let top_right_lon = min(longitude + BOUNDING_BOX_HALF_WIDTH, LON_MAX)
         let top_right_lat = min(latitude + BOUNDING_BOX_HALF_HEIGHT, LAT_MAX)
         
-        print("\(bottom_left_lon),\(bottom_left_lat),\(top_right_lon),\(top_right_lat)")
         return "\(bottom_left_lon),\(bottom_left_lat),\(top_right_lon),\(top_right_lat)"
     }
     
@@ -164,7 +162,6 @@ class ViewController: UIViewController, UITextFieldDelegate {
         
         var withPageDictionary = methodArguments
         withPageDictionary["page"] = randomPage
-        print(withPageDictionary)
         
         // 3 - Initialize shared NSURLSession
         let session = NSURLSession.sharedSession()
@@ -219,7 +216,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
                     return
                 }
                 print("\(totalPhotos) photos found.")
-                self.statusText = "\(totalPhotos) photos found"
+                self.statusText = "\(totalPhotos) photo(s) found"
             }
             
             // photosArray is an array that contains dictionaries
@@ -294,8 +291,9 @@ class ViewController: UIViewController, UITextFieldDelegate {
         return (!urlVars.isEmpty ? "?" : "") + urlVars.joinWithSeparator("&")
     }
     
-    // Run only if textField is not empty or does not contain only whitespace
+    
     func executePhraseSearch() {
+        // Run only if textField is not empty or does not contain only whitespace
         if phraseTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" {
             
             var phraseSearchDictionary = methodArguments
@@ -311,17 +309,55 @@ class ViewController: UIViewController, UITextFieldDelegate {
     }
     
     func executeLatLonSearch() {
-        if latitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" && longitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" && latitudeTextField.text! != digitSet && longitudeTextField.text! != digitSet {
+        // Run only if textField is not empty or does not contain only whitespace
+        if latitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" && longitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) != "" {
             
-            var locationSearchDictionary = methodArguments
-            locationSearchDictionary["bbox"] = createBoundingBoxString()
-            
-            // Call Flickr API method
-            getImageFromFlickrBySearch(locationSearchDictionary)
+            if validLatitude() && validLongitude() {
+                var locationSearchDictionary = methodArguments
+                locationSearchDictionary["bbox"] = createBoundingBoxString()
+                
+                // Call Flickr API method
+                getImageFromFlickrBySearch(locationSearchDictionary)
+            } else {
+                if !validLatitude() && !validLongitude() {
+                    imageLabel.text = "Please enter valid latitude/longitude values!\nLatitude must be [-90, 90]\nLongitude must be [-180, 180]"
+                } else if !validLatitude() {
+                    imageLabel.text = "Latitude must be [-90, 90]"
+                } else {
+                    imageLabel.text = "Longitude must be [-180, 180]"
+                }
+            }
         } else {
-            imageLabel.text  = "Please enter valid latitude/longitude values!"
+            if latitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) == "" && longitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) == "" {
+                imageLabel.text  = "Lat/Lon fields cannot be empty!"
+            } else if latitudeTextField.text!.stringByTrimmingCharactersInSet(whitespaceSet) == "" {
+                imageLabel.text  = "Latitude field is empty!"
+            } else {
+                imageLabel.text  = "Longitude field is empty!"
+            }
             statusLabel.text = ""
             imageView.image = nil
+        }
+    }
+    
+    // Ensure that latitude and longitude text fields only include numbers within respective bounds
+    func validLatitude() -> Bool {
+        if let latitude: Double? = Double(latitudeTextField.text!) {
+            if latitude < LAT_MIN || latitude > LAT_MAX {
+                return false
+            } else {
+                return true
+            }
+        }
+    }
+    
+    func validLongitude() -> Bool {
+        if let longitude: Double? = Double(longitudeTextField.text!) {
+            if longitude < LON_MIN || longitude > LON_MAX {
+                return false
+            } else {
+                return true
+            }
         }
     }
     
